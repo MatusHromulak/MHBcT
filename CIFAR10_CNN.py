@@ -55,9 +55,7 @@ csv_logger = CSVLogger(history_point, append=True, separator=';')
 #data load
 (train_data, train_label), (test_data, test_label) = cifar10.load_data()
 
-#convert images to tensors
-#train_data = train_data.reshape(train_data.shape[0], height, width, 1)
-#test_data = test_data.reshape(test_data.shape[0], height, width, 1)
+#input shape definition
 input_shape = train_data.shape[1:]
 
 #normalize data
@@ -72,7 +70,7 @@ test_label = keras.utils.to_categorical(test_label, num_out_class)
 
 #model start
 model = Sequential()
-b_init = keras.initializers.Constant(value=0.05)
+b_init = keras.initializers.Constant(value=0.1)
 model.add(Conv2D(32, kernel_size=(3, 3),
                 padding='same',
                 activation='relu',
@@ -129,27 +127,27 @@ if aug_enable or aug_store_enable:
         #apply ZCA whitening
         zca_whitening=False,
         #degree range for random rotations
-        rotation_range=0,
+        rotation_range=40,
         #range for random horizontal shifts
-        width_shift_range=0.,
+        width_shift_range=0.3,
         #range for random vertical shifts
-        height_shift_range=0.,
+        height_shift_range=0.3,
         #shear Intensity (Shear angle in counter-clockwise direction as radians)
-        shear_range=0.,
+        shear_range=0.7,
         #range for random zoom
-        zoom_range=0.,
+        zoom_range=0.2,
         #range for random channel shifts
-        channel_shift_range=0.,
+        channel_shift_range=0.3,
         #points outside the boundaries of the input are filled according to the given mode ("constant", "nearest", "reflect", "wrap")
         fill_mode='nearest',
         #value used for points outside the boundaries when fill_mode = "constant"
         cval=0.,
         #randomly flip inputs horizontally
-        horizontal_flip=False,
+        horizontal_flip=True,
         #randomly flip inputs vertically
         vertical_flip=False,
         #rescaling factor
-        rescale=None,
+        rescale=1./255,
         #function that will be implied on each input
         preprocessing_function=None)
 

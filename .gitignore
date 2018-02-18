@@ -105,5 +105,5 @@ venv.bak/
 .mypy_cache/
 
 # result files
-MNIST_data/
+CIFAR10_result/
 MNIST_result/
