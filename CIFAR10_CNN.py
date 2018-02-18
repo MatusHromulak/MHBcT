@@ -1,4 +1,4 @@
-#MNIST data CNN classification
+#CIFAR10 data CNN classification
 
 from __future__ import print_function
 import argparse
@@ -8,21 +8,19 @@ import os
 
 import keras
 from keras.callbacks import CSVLogger
-from keras.datasets import mnist
+from keras.datasets import cifar10
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras.models import Sequential
 from keras.preprocessing.image import ImageDataGenerator
 
 #model variables
-width = 28
-height = 28
 num_out_class = 10
 batch_size = 50
 epochs = 10
 
 #argument parsing
-arg_par = argparse.ArgumentParser(prog='MNIST CNN')
+arg_par = argparse.ArgumentParser(prog='CIFAR10 CNN')
 arg_par.add_argument('--aug', action='store_true', default=False, dest='aug_enable')
 arg_par.add_argument('--augstore', action='store_true', default=False, dest='aug_store_enable')
 arg_par.add_argument('--arch', action='store_true', default=False, dest='arch_save_enable')
@@ -36,18 +34,18 @@ arch_save_enable = args.arch_save_enable    #export model architecture to json
 
 #save file and folder names and paths preparation
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-result_folder = os.path.join(os.getcwd(), 'MNIST_result')
-image_folder = os.path.join(result_folder, 'MNIST_image_' + date_time)
+result_folder = os.path.join(os.getcwd(), 'CIFAR10_result')
+image_folder = os.path.join(result_folder, 'CIFAR10_image_' + date_time)
 
 if aug_enable or aug_store_enable:
-    model_file = 'mnist_aug_' + date_time + '_model.h5'
-    history_file = 'mnist_aug_' + date_time + '_history.csv'
+    model_file = 'cifar10_aug_' + date_time + '_model.h5'
+    history_file = 'cifar10_aug_' + date_time + '_history.csv'
 else:
-    model_file = 'mnist_' + date_time + '_model.h5'
-    history_file = 'mnist_' + date_time +'_history.csv'
+    model_file = 'cifar10_' + date_time + '_model.h5'
+    history_file = 'cifar10_' + date_time +'_history.csv'
 
 if arch_save_enable:
-    arch_file = 'mnist_' + date_time + '_architecture.json'
+    arch_file = 'cifar10_' + date_time + '_architecture.json'
     arch_point = os.path.join(result_folder, arch_file)
     
 model_point = os.path.join(result_folder, model_file)
@@ -55,12 +53,12 @@ history_point = os.path.join(result_folder, history_file)
 csv_logger = CSVLogger(history_point, append=True, separator=';')
 
 #data load
-(train_data, train_label), (test_data, test_label) = mnist.load_data()
+(train_data, train_label), (test_data, test_label) = cifar10.load_data()
 
 #convert images to tensors
-train_data = train_data.reshape(train_data.shape[0], height, width, 1)
-test_data = test_data.reshape(test_data.shape[0], height, width, 1)
-input_shape = (height, width, 1)
+#train_data = train_data.reshape(train_data.shape[0], height, width, 1)
+#test_data = test_data.reshape(test_data.shape[0], height, width, 1)
+input_shape = train_data.shape[1:]
 
 #normalize data
 train_data = train_data.astype('float32')
@@ -131,17 +129,17 @@ if aug_enable or aug_store_enable:
         #apply ZCA whitening
         zca_whitening=False,
         #degree range for random rotations
-        rotation_range=10,
+        rotation_range=0,
         #range for random horizontal shifts
-        width_shift_range=0.2,
+        width_shift_range=0.,
         #range for random vertical shifts
-        height_shift_range=0.2,
+        height_shift_range=0.,
         #shear Intensity (Shear angle in counter-clockwise direction as radians)
-        shear_range=0.3,
+        shear_range=0.,
         #range for random zoom
-        zoom_range=0.3,
+        zoom_range=0.,
         #range for random channel shifts
-        channel_shift_range=0.3,
+        channel_shift_range=0.,
         #points outside the boundaries of the input are filled according to the given mode ("constant", "nearest", "reflect", "wrap")
         fill_mode='nearest',
         #value used for points outside the boundaries when fill_mode = "constant"
