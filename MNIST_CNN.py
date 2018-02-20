@@ -4,8 +4,6 @@ from __future__ import print_function
 import argparse
 import datetime
 import json
-import os
-
 import keras
 from keras.callbacks import CSVLogger
 from keras.datasets import mnist
@@ -13,6 +11,9 @@ from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras.models import Sequential
 from keras.preprocessing.image import ImageDataGenerator
+import numpy as np
+import os
+import sys
 
 def parse_arguments():
     #argument parsing
@@ -26,7 +27,7 @@ def parse_arguments():
     mod_se = args.mod_se    #export model data
     arch_se = args.arch_se  #export model architecture to json
     
-    return [aug_e, mod_se, arch_se]
+    return aug_e, mod_se, arch_se
 
 def prepare_files_folders(aug_e):
     #save file and folder names and paths preparation
@@ -47,7 +48,7 @@ def prepare_files_folders(aug_e):
     if not os.path.isdir(res_fol):
         os.makedirs(res_fol)
     
-    return [d_t, res_fol, mod_p, arch_p]
+    return d_t, res_fol, mod_p, arch_p
 
 def json_export(arch_p, model):
     #export architecture to a json file
@@ -59,24 +60,26 @@ def save_model(mod_p, model):
     #save the trained model
     model.save(mod_p)
 
-def data(height, width, num_out_class):
+def process_data(height, width, num_out_class):
     #load data as function arguments
-    (data.trn_dt, data.trn_lbl), (data.tst_dt, data.tst_lbl) = mnist.load_data()
+    (trn_dt, trn_lbl), (tst_dt, tst_lbl) = mnist.load_data()
 
     #convert images to tensors
-    data.trn_dt = data.trn_dt.reshape(data.trn_dt.shape[0], height, width, 1)
-    data.tst_dt = data.tst_dt.reshape(data.tst_dt.shape[0], height, width, 1)
-    data.in_shape = (height, width, 1)
+    trn_dt = trn_dt.reshape(trn_dt.shape[0], height, width, 1)
+    tst_dt = tst_dt.reshape(tst_dt.shape[0], height, width, 1)
+    in_shape = (height, width, 1)
 
     #normalize data
-    data.trn_dt = data.trn_dt.astype('float32')
-    data.tst_dt = data.tst_dt.astype('float32')
-    data.trn_dt /= 255
-    data.tst_dt /= 255
+    trn_dt = trn_dt.astype('float32')
+    tst_dt = tst_dt.astype('float32')
+    trn_dt /= 255
+    tst_dt /= 255
 
     #convert class vector (int) to binary class - one hot encoding
-    data.trn_lbl = keras.utils.to_categorical(data.trn_lbl, num_out_class)
-    data.tst_lbl = keras.utils.to_categorical(data.tst_lbl, num_out_class)
+    trn_lbl = keras.utils.to_categorical(trn_lbl, num_out_class)
+    tst_lbl = keras.utils.to_categorical(tst_lbl, num_out_class)
+    
+    return trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape
 
 def create_logger(aug_e, d_t, res_fol, it_n):
     if aug_e:
@@ -116,24 +119,21 @@ def create_model(in_shape, bias_init, num_out_class, d_t, res_fol, it_n):
     model.compile(loss='categorical_crossentropy',
                     optimizer='adam',
                     metrics=['accuracy'])
-                    
-    hyp_f = 'mnist_' + d_t + '_' + it_n + '_hyper.txt'
-    hyp_p = os.path.join(res_fol, hyp_f)
-    mod_summ = str(model.summary())
-    with open(hyp_p,'w') as outfile1:
-        outfile1.write(mod_summ)
-    
-    sum_f = 'mnist_' + d_t + '_' + it_n + '_model.txt'
-    sum_p = os.path.join(res_fol, sum_f)
-    with open(sum_p,'w') as outfile2:
-        model.summary(print_fn=lambda x: outfile2.write(x + '\n'))
 
+    mod_f = 'mnist_' + d_t + '_' + it_n + '_model.txt'
+    mod_p = os.path.join(res_fol, mod_f)
+    with open(mod_p,'w') as out_h:
+        std_stdout = sys.stdout
+        sys.stdout = out_h
+        mod_summ = str(model.summary())
+        out_h.write(mod_summ)
+        sys.stdout = std_stdout
+        
     return model
 
 def train_model(model, aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl, csv_logger):
     #augmented training
     if aug_e:
-        print("Augmented training")
         #definition of data augmentation arguments to be used
         generator = ImageDataGenerator(
             #set input mean to 0 over the dataset, feature-wise
@@ -180,67 +180,84 @@ def train_model(model, aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_l
         model.fit_generator(generator.flow(trn_dt, trn_lbl,
                                         batch_size=batch_size),
                             epochs=epochs, 
-                            verbose=1, 
+                            verbose=0, 
                             validation_data=(tst_dt, tst_lbl),
                             callbacks=[csv_logger])
     #non-augmented training    
     else:
-        print("Non-augmented training")
         model.fit(trn_dt, trn_lbl,
                     batch_size=batch_size,
                     epochs=epochs,
-                    verbose=1,
+                    verbose=0,
                     validation_data=(tst_dt, tst_lbl),
                     callbacks=[csv_logger])
     return model
 
-def eval_model(model, tst_dt, tst_lbl):
+def eval_model(model, tst_dt, tst_lbl, message):
     #evaluate model
     score = model.evaluate(tst_dt, tst_lbl, verbose=0)
-    print('Loss:', score[0])
-    print('Acuracy:', score[1])
+    print(message)
+    print('Loss: ' + str(score[0]) + ' Acuracy: ' + str(score[1]))
     
 def main():
-    #model variables
+    #fixed variables
     height = 28
     width = 28
     num_out_class = 10
-    batch_size = 50
-    epochs = 1
+    
+    #hyperparameters
+    activation = ['relu', 'tanh', 'sigmoid']
+    batch_size = [50, 75, 100]
+    bias_constant = [0.05, 0.1, 0.2]
+    dropout = [0.1, 0.25, 0.5]
+    epochs = [5, 7, 10]
+    layers = [2, 4, 6]
+    #learning_decay = [0.0, 0.01, 0.02, 0.04]
+    learning_rate = [0.01, 0.05, 0.1, 0.2]
+    loss = ['mean_squared_error', 'categorical_crossentropy']
+    neurons = [10, 20, 30, 40, 50, 60, 70, 80]
+    optimizer = ['SGD', 'RMSprop', 'Adagrad', 'Adadelta', 'Adam', 'Adamax', 'Nadam']
+    pooling = ['MaxPool', 'AvgPool']
+    seed = [32, 64, 128]    #np.random.seed(seed[0])
     
     #parse command line arguments
-    comm_line_args = parse_arguments()
-    aug_e, mod_se, arch_se = [bool(x) for x in comm_line_args]
+    aug_e, mod_se, arch_se = parse_arguments()
+    #aug_e, mod_se, arch_se = [bool(x) for x in comm_line_args]
     
     #save file and folder names and paths preparation
-    file_data = prepare_files_folders(aug_e)
-    d_t, res_fol, mod_p, arch_p = [str(x) for x in file_data]
+    d_t, res_fol, mod_p, arch_p = prepare_files_folders(aug_e)
+    #d_t, res_fol, mod_p, arch_p = [str(x) for x in file_data]
     
     #read in and prepare input data to data. function arguments
-    data(height, width, num_out_class)
+    trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape = process_data(height, width, num_out_class)
     
     for x in range (0, 1):
+        message = str(x)
+        
         #prepare training history logger
         it_n = str(x)
         csv_logger = create_logger(aug_e, d_t, res_fol, it_n)
         
         #create model
         bias_init = keras.initializers.Constant(value=0.05)
-        model = create_model(data.in_shape, bias_init, num_out_class, d_t, res_fol, it_n)
+        model = create_model(in_shape, bias_init, num_out_class, d_t, res_fol, it_n)
             
         model = train_model(model, aug_e,
-                            data.trn_dt, data.trn_lbl,
+                            trn_dt, trn_lbl,
                             batch_size, epochs,
-                            data.tst_dt, data.tst_lbl,
+                            tst_dt, tst_lbl,
                             csv_logger)
         
-        eval_model(model, data.tst_dt, data.tst_lbl)
+        eval_model(model, tst_dt, tst_lbl, message)
     
+    #export model architecture
     if arch_se:
         json_export(arch_p, model)
         
+    #export model
     if mod_se:
         save_model(mod_p, model)
 
+#run
 if __name__ == "__main__":
     main()
