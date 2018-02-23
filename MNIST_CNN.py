@@ -20,44 +20,40 @@ def parse_arguments():
     arg_par = argparse.ArgumentParser(prog='MNIST CNN')
     arg_par.add_argument('--aug', action='store_true', default=False, dest='aug_e')
     arg_par.add_argument('--arch', action='store_true', default=False, dest='arch_se')
+    arg_par.add_argument('--hyp', action='store_true', default=False, dest='hyp_se')
     arg_par.add_argument('--model', action='store_true', default=False, dest='mod_se')
     
     args = arg_par.parse_args()
     aug_e = args.aug_e      #enable data augmentation
     mod_se = args.mod_se    #export model data
+    hyp_se = args.hyp_se    #export hyperparameters
     arch_se = args.arch_se  #export model architecture to json
     
-    return aug_e, mod_se, arch_se
+    return aug_e, mod_se, hyp_se, arch_se
 
-def prepare_files_folders(aug_e):
+def prepare_files_folders():
     #save file and folder names and paths preparation
-    d_t = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    date_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     res_fol = os.path.join(os.getcwd(), 'MNIST_result')
-    img_fol = os.path.join(res_fol, 'MNIST_image_' + d_t)
-
-    if aug_e:
-        mod_f = 'mnist_aug_' + d_t + '_model.h5'
-    else:
-        mod_f = 'mnist_' + d_t + '_model.h5'
-
-    mod_p = os.path.join(res_fol, mod_f)
-    arch_f = 'mnist_' + d_t + '_architecture.json'
-    arch_p = os.path.join(res_fol, arch_f)
 
     #create folder for output data
     if not os.path.isdir(res_fol):
         os.makedirs(res_fol)
     
-    return d_t, res_fol, mod_p, arch_p
+    return date_time, res_fol
 
-def json_export(arch_p, model):
+def json_export(res_fol, model, iter_name):
     #export architecture to a json file
+    arch_f = 'mnist_' + date_time + '_' + iter_name + '_architecture.json'
+    arch_p = os.path.join(res_fol, arch_f)
     arch_string = model.to_json()
     with open(arch_p, 'w') as outfile:
         json.dump(arch_string, outfile)
 
-def save_model(mod_p, model):
+def save_model(res_fol, model, iter_name):
     #save the trained model
+    mod_f = 'mnist_' + date_time + '_' + iter_name + '_model.h5'
+    mod_p = os.path.join(res_fol, mod_f)
     model.save(mod_p)
 
 def process_data(height, width, num_out_class):
@@ -81,53 +77,91 @@ def process_data(height, width, num_out_class):
     
     return trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape
 
-def create_logger(aug_e, d_t, res_fol, it_n):
-    if aug_e:
-        his_f = 'mnist_aug_' + d_t + '_' + it_n + '_history.csv'
-    else:
-        his_f = 'mnist_' + d_t + '_' + it_n +'_history.csv'
-        
+def create_logger(date_time, res_fol, iter_name):
+    his_f = 'mnist_' + date_time + '_' + iter_name + '_history.csv'    
     his_p = os.path.join(res_fol, his_f)
     return(CSVLogger(his_p, append=True, separator=';'))
     
-def create_model(in_shape, bias_init, num_out_class, d_t, res_fol, it_n):
+def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim, 
+                pooling, in_shape, num_out_class, date_time, res_fol, iter_name):
     model = Sequential()
     
-    model.add(Conv2D(32, kernel_size=(3, 3),
-                    padding='same',
-                    activation='relu',
-                    use_bias=True,
-                    bias_initializer=bias_init,
-                    input_shape=in_shape))
-    model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-    model.add(Conv2D(64, kernel_size=(3, 3),
-                    padding='same',
-                    activation='relu',
-                    use_bias=True,
-                    bias_initializer=bias_init,
-                    input_shape=in_shape))         
-    model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+    if layers >= 2:
+        model.add(Conv2D(neurons, kernel_size=(3, 3),
+                        padding='same',
+                        activation=activation,
+                        use_bias=True,
+                        bias_initializer=bias_init,
+                        input_shape=in_shape))
+        model.add(Conv2D(neurons, kernel_size=(3, 3),
+                        padding='same',
+                        activation=activation,
+                        use_bias=True,
+                        bias_initializer=bias_init,
+                        input_shape=in_shape))
+        if pooling == 'MaxPool':
+            model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+        if pooling == 'AvgPool':
+            model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
+    
+    if layers >= 4:
+        model.add(Conv2D(neurons*2, kernel_size=(3, 3),
+                        padding='same',
+                        activation=activation,
+                        use_bias=True,
+                        bias_initializer=bias_init,
+                        input_shape=in_shape))
+        model.add(Conv2D(neurons*2, kernel_size=(3, 3),
+                        padding='same',
+                        activation=activation,
+                        use_bias=True,
+                        bias_initializer=bias_init,
+                        input_shape=in_shape))
+        if pooling == 'MaxPool':
+            model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+        if pooling == 'AvgPool':
+            model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
+    
+    if layers >= 6:
+        model.add(Conv2D(neurons*4, kernel_size=(3, 3),
+                        padding='same',
+                        activation=activation,
+                        use_bias=True,
+                        bias_initializer=bias_init,
+                        input_shape=in_shape))
+        model.add(Conv2D(neurons*4, kernel_size=(3, 3),
+                        padding='same',
+                        activation=activation,
+                        use_bias=True,
+                        bias_initializer=bias_init,
+                        input_shape=in_shape))                    
+        if pooling == 'MaxPool':
+            model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+        if pooling == 'AvgPool':
+            model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
+    
     model.add(Flatten())
-    model.add(Dense(1024, activation='relu',
+    model.add(Dense(1024, activation=activation,
                     use_bias=True,
                     bias_initializer=bias_init))
-    model.add(Dropout(0.25))
+    model.add(Dropout(dropout))
     model.add(Dense(num_out_class, activation='softmax',
                     use_bias=True,
                     bias_initializer=bias_init))
-
-    model.compile(loss='categorical_crossentropy',
-                    optimizer='adam',
+    
+    model.compile(loss=loss,
+                    optimizer=optim,
                     metrics=['accuracy'])
-
-    mod_f = 'mnist_' + d_t + '_' + it_n + '_model.txt'
-    mod_p = os.path.join(res_fol, mod_f)
-    with open(mod_p,'w') as out_h:
-        std_stdout = sys.stdout
-        sys.stdout = out_h
-        mod_summ = str(model.summary())
-        out_h.write(mod_summ)
-        sys.stdout = std_stdout
+    
+    if hyp_se:
+        mod_f = 'mnist_' + date_time + '_' + iter_name + '_model.txt'
+        mod_p = os.path.join(res_fol, mod_f)
+        with open(mod_p,'w') as out_h:
+            std_stdout = sys.stdout
+            sys.stdout = out_h
+            mod_summ = str(model.summary())
+            out_h.write(mod_summ)
+            sys.stdout = std_stdout
         
     return model
 
@@ -193,10 +227,10 @@ def train_model(model, aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_l
                     callbacks=[csv_logger])
     return model
 
-def eval_model(model, tst_dt, tst_lbl, message):
+def eval_model(model, tst_dt, tst_lbl, iter_name):
     #evaluate model
     score = model.evaluate(tst_dt, tst_lbl, verbose=0)
-    print(message)
+    print(iter_name)
     print('Loss: ' + str(score[0]) + ' Acuracy: ' + str(score[1]))
     
 def main():
@@ -206,57 +240,77 @@ def main():
     num_out_class = 10
     
     #hyperparameters
-    activation = ['relu', 'tanh', 'sigmoid']
-    batch_size = [50, 75, 100]
-    bias_constant = [0.05, 0.1, 0.2]
-    dropout = [0.1, 0.25, 0.5]
-    epochs = [5, 7, 10]
+    activation = ['relu', 'tanh']
+    batch_size = 50                 #0.08% of the dataset
+    dropout = 0.5                   #https://arxiv.org/abs/1207.0580
+    epochs = 7
+    init_bias = 0.1                 #citation needed
     layers = [2, 4, 6]
-    #learning_decay = [0.0, 0.01, 0.02, 0.04]
-    learning_rate = [0.01, 0.05, 0.1, 0.2]
-    loss = ['mean_squared_error', 'categorical_crossentropy']
-    neurons = [10, 20, 30, 40, 50, 60, 70, 80]
-    optimizer = ['SGD', 'RMSprop', 'Adagrad', 'Adadelta', 'Adam', 'Adamax', 'Nadam']
+    optimizer = ['SGD', 'Adam']     #citation needed
+    learn_rate = [0.01, 0.05, 0.1]  #citation needed
+    loss = 'categorical_crossentropy'
     pooling = ['MaxPool', 'AvgPool']
-    seed = [32, 64, 128]    #np.random.seed(seed[0])
+    neurons = [10, 20, 30, 40, 50, 60, 70, 80]
     
     #parse command line arguments
-    aug_e, mod_se, arch_se = parse_arguments()
-    #aug_e, mod_se, arch_se = [bool(x) for x in comm_line_args]
+    aug_e, mod_se, hyp_se, arch_se = parse_arguments()
     
     #save file and folder names and paths preparation
-    d_t, res_fol, mod_p, arch_p = prepare_files_folders(aug_e)
-    #d_t, res_fol, mod_p, arch_p = [str(x) for x in file_data]
+    date_time, res_fol = prepare_files_folders()
     
     #read in and prepare input data to data. function arguments
     trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape = process_data(height, width, num_out_class)
     
-    for x in range (0, 1):
-        message = str(x)
-        
-        #prepare training history logger
-        it_n = str(x)
-        csv_logger = create_logger(aug_e, d_t, res_fol, it_n)
-        
-        #create model
-        bias_init = keras.initializers.Constant(value=0.05)
-        model = create_model(in_shape, bias_init, num_out_class, d_t, res_fol, it_n)
-            
-        model = train_model(model, aug_e,
-                            trn_dt, trn_lbl,
-                            batch_size, epochs,
-                            tst_dt, tst_lbl,
-                            csv_logger)
-        
-        eval_model(model, tst_dt, tst_lbl, message)
-    
-    #export model architecture
-    if arch_se:
-        json_export(arch_p, model)
-        
-    #export model
-    if mod_se:
-        save_model(mod_p, model)
+    for a in activation:
+        if a == 'relu':
+            iter_name = 'r'
+        if a == 'tanh':
+            iter_name = 't'
+        for la in layers:
+            iter_name += str(la)
+            for lr in learn_rate:
+                for op in optimizer:
+                    if op == 'SGD':
+                        optim = keras.optimizers.SGD(lr=lr)
+                        iter_name += 'S'
+                    if op == 'Adam':
+                        optim = keras.optimizers.Adam(lr=lr)
+                        iter_name += 'A'
+                    iter_name += str(lr).split('.')[1]
+                    for p in pooling:
+                        if p == 'MaxPool':
+                            iter_name += 'M'
+                        if p == 'AvgPool':
+                            iter_name += 'A'
+                        for n in neurons:
+                            iter_name += str(n)
+                        
+                            #prepare training history logger
+                            iter_name = str(x)
+                            csv_logger = create_logger(date_time, res_fol, iter_name)
+                            
+                            #create model
+                            bias_init = keras.initializers.Constant(value=init_bias)
+                            model = create_model(hyp_se, a, bias_init, 
+                                                dropout, la, loss, n, 
+                                                optim, p, in_shape, num_out_class, 
+                                                date_time, res_fol, iter_name)
+                            
+                            model = train_model(model, aug_e,
+                                                trn_dt, trn_lbl,
+                                                batch_size, epochs,
+                                                tst_dt, tst_lbl,
+                                                csv_logger)
+                            
+                            eval_model(model, tst_dt, tst_lbl, iter_name)
+                            
+                            #export model architecture
+                            if arch_se:
+                                json_export(res_fol, model, iter_name)
+                            
+                            #export model
+                            if mod_se:
+                                save_model(res_fol, model, iter_name)
 
 #run
 if __name__ == "__main__":
