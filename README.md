@@ -1,3 +1,7 @@
 # MHBcT
 
-Nothing atm.
+Dependencies:
+TensorFlow
+Keras
+TensorBoard
+	localhost:6006

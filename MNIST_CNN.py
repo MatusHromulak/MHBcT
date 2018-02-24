@@ -6,30 +6,41 @@ import datetime
 import json
 import keras
 from keras.callbacks import CSVLogger
+from keras.callbacks import TensorBoard
 from keras.datasets import mnist
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Conv2D, MaxPooling2D
+from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
 from keras.models import Sequential
 from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 import os
 import sys
+from time import time
+
+class TimeLog(keras.callbacks.Callback):
+    def on_train_begin(self, logs=None):
+        self.times = time()
+        
+    def on_train_end(self, logs=None):
+        self.times = (time() - self.times)
 
 def parse_arguments():
     #argument parsing
     arg_par = argparse.ArgumentParser(prog='MNIST CNN')
     arg_par.add_argument('--aug', action='store_true', default=False, dest='aug_e')
     arg_par.add_argument('--arch', action='store_true', default=False, dest='arch_se')
+    arg_par.add_argument('--board', action='store_true', default=False, dest='board_se')
     arg_par.add_argument('--hyp', action='store_true', default=False, dest='hyp_se')
     arg_par.add_argument('--model', action='store_true', default=False, dest='mod_se')
     
     args = arg_par.parse_args()
-    aug_e = args.aug_e      #enable data augmentation
-    mod_se = args.mod_se    #export model data
-    hyp_se = args.hyp_se    #export hyperparameters
-    arch_se = args.arch_se  #export model architecture to json
+    aug_e = args.aug_e          #enable data augmentation
+    board_se = args.board_se    #enable Tensorboard logging
+    mod_se = args.mod_se        #export model data
+    hyp_se = args.hyp_se        #export hyperparameters
+    arch_se = args.arch_se      #export model architecture to json
     
-    return aug_e, mod_se, hyp_se, arch_se
+    return aug_e, arch_se, board_se, hyp_se, mod_se
 
 def prepare_files_folders():
     #save file and folder names and paths preparation
@@ -82,7 +93,7 @@ def create_logger(date_time, res_fol, iter_name):
     his_p = os.path.join(res_fol, his_f)
     return(CSVLogger(his_p, append=True, separator=';'))
     
-def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim, 
+def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim,
                 pooling, in_shape, num_out_class, date_time, res_fol, iter_name):
     model = Sequential()
     
@@ -165,7 +176,19 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
         
     return model
 
-def train_model(model, aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl, csv_logger):
+def train_model(model, board_se, date_time, res_fol, iter_name, aug_e, trn_dt, trn_lbl,
+                batch_size, epochs, tst_dt, tst_lbl, csv_logger):
+    time_cb = TimeLog()
+    if board_se:
+        #create folder for log data
+        log_fol = os.path.join(res_fol, 'mnist_' + date_time + '_' + iter_name + '_logs')
+        if not os.path.isdir(log_fol):
+            os.makedirs(log_fol)
+        tensorboard = TensorBoard(log_dir=log_fol.format(time()))
+        callback = [csv_logger, time_cb, tensorboard]
+    else:
+        callback = [csv_logger, time_cb]
+    
     #augmented training
     if aug_e:
         #definition of data augmentation arguments to be used
@@ -216,7 +239,7 @@ def train_model(model, aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_l
                             epochs=epochs, 
                             verbose=0, 
                             validation_data=(tst_dt, tst_lbl),
-                            callbacks=[csv_logger])
+                            callbacks=callback)
     #non-augmented training    
     else:
         model.fit(trn_dt, trn_lbl,
@@ -224,14 +247,15 @@ def train_model(model, aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_l
                     epochs=epochs,
                     verbose=0,
                     validation_data=(tst_dt, tst_lbl),
-                    callbacks=[csv_logger])
-    return model
+                    callbacks=callback)
+    res_time = time_cb.times
+    return model, res_time
 
-def eval_model(model, tst_dt, tst_lbl, iter_name):
+def eval_model(model, tst_dt, tst_lbl, message, res_time):
     #evaluate model
     score = model.evaluate(tst_dt, tst_lbl, verbose=0)
-    print(iter_name)
-    print('Loss: ' + str(score[0]) + ' Acuracy: ' + str(score[1]))
+    print(message)
+    print('Loss: ' + str(score[0]) + ' Acuracy: ' + str(score[1]) + ' Time: ' + str(res_time))
     
 def main():
     #fixed variables
@@ -247,13 +271,13 @@ def main():
     init_bias = 0.1                 #citation needed
     layers = [2, 4, 6]
     optimizer = ['SGD', 'Adam']     #citation needed
-    learn_rate = [0.01, 0.05, 0.1]  #citation needed
+    learn_rate = 0.01               #citation needed
     loss = 'categorical_crossentropy'
     pooling = ['MaxPool', 'AvgPool']
-    neurons = [10, 20, 30, 40, 50, 60, 70, 80]
+    neurons = [20, 40, 60, 80]
     
     #parse command line arguments
-    aug_e, mod_se, hyp_se, arch_se = parse_arguments()
+    aug_e, arch_se, board_se, hyp_se, mod_se = parse_arguments()
     
     #save file and folder names and paths preparation
     date_time, res_fol = prepare_files_folders()
@@ -264,54 +288,67 @@ def main():
     for a in activation:
         if a == 'relu':
             iter_name = 'r'
+            message = ['Activation: relu']
         if a == 'tanh':
             iter_name = 't'
+            message = ['Activation: tanh']
         for la in layers:
             iter_name += str(la)
-            for lr in learn_rate:
-                for op in optimizer:
-                    if op == 'SGD':
-                        optim = keras.optimizers.SGD(lr=lr)
-                        iter_name += 'S'
-                    if op == 'Adam':
-                        optim = keras.optimizers.Adam(lr=lr)
-                        iter_name += 'A'
-                    iter_name += str(lr).split('.')[1]
-                    for p in pooling:
-                        if p == 'MaxPool':
-                            iter_name += 'M'
-                        if p == 'AvgPool':
-                            iter_name += 'A'
-                        for n in neurons:
-                            iter_name += str(n)
+            message.append(str('Layers: ' + str(la)))
+            for op in optimizer:
+                if op == 'SGD':
+                    optim = keras.optimizers.SGD(lr=learn_rate)
+                    iter_name += 's'
+                    message.append('Optimizer: SGD')
+                if op == 'Adam':
+                    optim = keras.optimizers.Adam(lr=learn_rate)
+                    iter_name += 'a'
+                    message.append('Optimizer: Adam')
+                for p in pooling:
+                    if p == 'MaxPool':
+                        iter_name += 'm'
+                        message.append('Pooling: MaxPooling')
+                    if p == 'AvgPool':
+                        iter_name += 'a'
+                        message.append('Pooling: AveragePooling')
+                    for n in neurons:
+                        iter_name += str(n)
+                        message.append(str('Neurons: ' + str(n)))
+                    
+                        #prepare training history logger
+                        csv_logger = create_logger(date_time, res_fol, iter_name)
                         
-                            #prepare training history logger
-                            iter_name = str(x)
-                            csv_logger = create_logger(date_time, res_fol, iter_name)
+                        #create model
+                        bias_init = keras.initializers.Constant(value=init_bias)
+                        model = create_model(hyp_se, a, bias_init, 
+                                            dropout, la, loss, n, 
+                                            optim, p, in_shape, num_out_class, 
+                                            date_time, res_fol, iter_name)
+                        
+                        model, res_time = train_model(model, board_se, date_time, res_fol, iter_name,
+                                            aug_e, trn_dt, trn_lbl, batch_size, epochs,
+                                            tst_dt, tst_lbl, csv_logger)
+                        
+                        eval_model(model, tst_dt, tst_lbl, message, res_time)
+                        
+                        #export model architecture
+                        if arch_se:
+                            json_export(res_fol, model, iter_name)
+                        
+                        #export model
+                        if mod_se:
+                            save_model(res_fol, model, iter_name)
                             
-                            #create model
-                            bias_init = keras.initializers.Constant(value=init_bias)
-                            model = create_model(hyp_se, a, bias_init, 
-                                                dropout, la, loss, n, 
-                                                optim, p, in_shape, num_out_class, 
-                                                date_time, res_fol, iter_name)
-                            
-                            model = train_model(model, aug_e,
-                                                trn_dt, trn_lbl,
-                                                batch_size, epochs,
-                                                tst_dt, tst_lbl,
-                                                csv_logger)
-                            
-                            eval_model(model, tst_dt, tst_lbl, iter_name)
-                            
-                            #export model architecture
-                            if arch_se:
-                                json_export(res_fol, model, iter_name)
-                            
-                            #export model
-                            if mod_se:
-                                save_model(res_fol, model, iter_name)
-
+                        iter_name = iter_name[:-len(str(n))]
+                        message.pop()
+                    iter_name = iter_name[:-len(str(p))]
+                    message.pop()
+                iter_name = iter_name[:-len(str(op))]
+                message.pop()
+            iter_name = iter_name[:-len(str(la))]
+            message.pop()
+        iter_name = iter_name[:-len(str(a))]
+        message.pop()
 #run
 if __name__ == "__main__":
     main()
