@@ -1,20 +1,21 @@
 # MHBcT
 #MNIST_CNN.py
 Run as:
-> python MNIST_CNN.py
+> python MNIST_CNN.py <arguments>
 
 Dependencies:
 TensorFlow
 Keras
 TensorBoard
 
-Supported arguments:
---aug_e		- enable data augmentation
---board_se	- enable TensorBoard logging
---mod_se	- export model data
---hist_se	- export trainning history data
---hyp_se	- export hyperparameters
---arch_se	- export model architecture to json
+Supported optional arguments:
+--aug	- enable data augmentation
+--arch	- export model architecture to json
+--board	- enable TensorBoard logging
+--model	- export model data
+--hist	- export trainning history data
+--hyp	- export hyperparameters
+
 
 It is recommended to redirect console output to a file:
 > python MNIST_CNN.py console_out.txt 2>&1

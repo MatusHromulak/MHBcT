@@ -354,6 +354,9 @@ def main():
                         #evaluate model
                         eval_model(model, tst_dt, tst_lbl, message, res_time)
                         
+                        #clear current model
+                        del model
+                        
                         iter_name.pop()
                         message.pop()
                     iter_name.pop()
