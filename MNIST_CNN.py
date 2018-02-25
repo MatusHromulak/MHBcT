@@ -30,6 +30,7 @@ def parse_arguments():
     arg_par.add_argument('--aug', action='store_true', default=False, dest='aug_e')
     arg_par.add_argument('--arch', action='store_true', default=False, dest='arch_se')
     arg_par.add_argument('--board', action='store_true', default=False, dest='board_se')
+    arg_par.add_argument('--hist', action='store_true', default=False, dest='hist_se')
     arg_par.add_argument('--hyp', action='store_true', default=False, dest='hyp_se')
     arg_par.add_argument('--model', action='store_true', default=False, dest='mod_se')
     
@@ -37,10 +38,11 @@ def parse_arguments():
     aug_e = args.aug_e          #enable data augmentation
     board_se = args.board_se    #enable Tensorboard logging
     mod_se = args.mod_se        #export model data
+    hist_se = args.hist_se      #export trainning history data
     hyp_se = args.hyp_se        #export hyperparameters
     arch_se = args.arch_se      #export model architecture to json
     
-    return aug_e, arch_se, board_se, hyp_se, mod_se
+    return aug_e, arch_se, board_se, hist_se, hyp_se, mod_se
 
 def prepare_files_folders():
     #save file and folder names and paths preparation
@@ -53,17 +55,17 @@ def prepare_files_folders():
     
     return date_time, res_fol
 
-def json_export(res_fol, model, iter_name):
+def json_export(res_fol, model, date_time, iter_name):
     #export architecture to a json file
-    arch_f = 'mnist_' + date_time + '_' + iter_name + '_architecture.json'
+    arch_f = 'mnist_' + date_time + '_' + ''.join(iter_name) + '_architecture.json'
     arch_p = os.path.join(res_fol, arch_f)
     arch_string = model.to_json()
     with open(arch_p, 'w') as outfile:
         json.dump(arch_string, outfile)
 
-def save_model(res_fol, model, iter_name):
+def save_model(res_fol, model, date_time, iter_name):
     #save the trained model
-    mod_f = 'mnist_' + date_time + '_' + iter_name + '_model.h5'
+    mod_f = 'mnist_' + date_time + '_' + ''.join(iter_name) + '_model.h5'
     mod_p = os.path.join(res_fol, mod_f)
     model.save(mod_p)
 
@@ -87,11 +89,6 @@ def process_data(height, width, num_out_class):
     tst_lbl = keras.utils.to_categorical(tst_lbl, num_out_class)
     
     return trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape
-
-def create_logger(date_time, res_fol, iter_name):
-    his_f = 'mnist_' + date_time + '_' + iter_name + '_history.csv'    
-    his_p = os.path.join(res_fol, his_f)
-    return(CSVLogger(his_p, append=True, separator=';'))
     
 def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim,
                 pooling, in_shape, num_out_class, date_time, res_fol, iter_name):
@@ -165,7 +162,7 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                     metrics=['accuracy'])
     
     if hyp_se:
-        mod_f = 'mnist_' + date_time + '_' + iter_name + '_model.txt'
+        mod_f = 'mnist_' + date_time + '_' + ''.join(iter_name) + '_model.txt'
         mod_p = os.path.join(res_fol, mod_f)
         with open(mod_p,'w') as out_h:
             std_stdout = sys.stdout
@@ -176,18 +173,27 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
         
     return model
 
-def train_model(model, board_se, date_time, res_fol, iter_name, aug_e, trn_dt, trn_lbl,
-                batch_size, epochs, tst_dt, tst_lbl, csv_logger):
+def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
+                aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl):
+    
+    #time callback
     time_cb = TimeLog()
+    callback = [time_cb]
+    
+    #TensorBoard callback
     if board_se:
-        #create folder for log data
-        log_fol = os.path.join(res_fol, 'mnist_' + date_time + '_' + iter_name + '_logs')
+        log_fol = os.path.join(res_fol, 'mnist_' + date_time + '_' + ''.join(iter_name) + '_logs')
         if not os.path.isdir(log_fol):
             os.makedirs(log_fol)
         tensorboard = TensorBoard(log_dir=log_fol.format(time()))
-        callback = [csv_logger, time_cb, tensorboard]
-    else:
-        callback = [csv_logger, time_cb]
+        callback.append(tensorboard)
+
+    #training history logger callback
+    if hist_se:
+        his_f = 'mnist_' + date_time + '_' + ''.join(iter_name) + '_history.csv'    
+        his_p = os.path.join(res_fol, his_f)
+        csv_logger = CSVLogger(his_p, append=True, separator=';')
+        callback.append(csv_logger)
     
     #augmented training
     if aug_e:
@@ -277,7 +283,7 @@ def main():
     neurons = [20, 40, 60, 80]
     
     #parse command line arguments
-    aug_e, arch_se, board_se, hyp_se, mod_se = parse_arguments()
+    aug_e, arch_se, board_se, hist_se, hyp_se, mod_se = parse_arguments()
     
     #save file and folder names and paths preparation
     date_time, res_fol = prepare_files_folders()
@@ -285,38 +291,46 @@ def main():
     #read in and prepare input data to data. function arguments
     trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape = process_data(height, width, num_out_class)
     
+    #activatio function selection
     for a in activation:
+        #iter_name - defines the configuration differentiating handle for file names
+        #message - defines the configuration differentiating message for the command line output
         if a == 'relu':
-            iter_name = 'r'
+            iter_name = ['r']
             message = ['Activation: relu']
         if a == 'tanh':
-            iter_name = 't'
+            iter_name = ['t']
             message = ['Activation: tanh']
+        
+        #number of layers selection
         for la in layers:
-            iter_name += str(la)
+            iter_name.append(str(la))
             message.append(str('Layers: ' + str(la)))
+            
+            #optimizer function selection
             for op in optimizer:
                 if op == 'SGD':
                     optim = keras.optimizers.SGD(lr=learn_rate)
-                    iter_name += 's'
+                    iter_name.append('s')
                     message.append('Optimizer: SGD')
                 if op == 'Adam':
                     optim = keras.optimizers.Adam(lr=learn_rate)
-                    iter_name += 'a'
+                    iter_name.append('a')
                     message.append('Optimizer: Adam')
+                
+                #pooling layer selection
                 for p in pooling:
                     if p == 'MaxPool':
-                        iter_name += 'm'
+                        iter_name.append('m')
                         message.append('Pooling: MaxPooling')
                     if p == 'AvgPool':
-                        iter_name += 'a'
+                        iter_name.append('a')
                         message.append('Pooling: AveragePooling')
-                    for n in neurons:
-                        iter_name += str(n)
-                        message.append(str('Neurons: ' + str(n)))
                     
-                        #prepare training history logger
-                        csv_logger = create_logger(date_time, res_fol, iter_name)
+                    #number of neurons selection
+                    for n in neurons:
+                        iter_name.append(str(n))
+                        message.append(str('Neurons: ' + str(n)))
                         
                         #create model
                         bias_init = keras.initializers.Constant(value=init_bias)
@@ -325,30 +339,32 @@ def main():
                                             optim, p, in_shape, num_out_class, 
                                             date_time, res_fol, iter_name)
                         
-                        model, res_time = train_model(model, board_se, date_time, res_fol, iter_name,
-                                            aug_e, trn_dt, trn_lbl, batch_size, epochs,
-                                            tst_dt, tst_lbl, csv_logger)
-                        
-                        eval_model(model, tst_dt, tst_lbl, message, res_time)
-                        
                         #export model architecture
                         if arch_se:
-                            json_export(res_fol, model, iter_name)
+                            json_export(res_fol, model, date_time, iter_name)
                         
-                        #export model
+                        #train model
+                        model, res_time = train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
+                                            aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl)
+                        
+                        #save model architecture, weights, training configuration and optimizer state
                         if mod_se:
-                            save_model(res_fol, model, iter_name)
-                            
-                        iter_name = iter_name[:-len(str(n))]
+                            save_model(res_fol, model, date_time, iter_name)
+                        
+                        #evaluate model
+                        eval_model(model, tst_dt, tst_lbl, message, res_time)
+                        
+                        iter_name.pop()
                         message.pop()
-                    iter_name = iter_name[:-len(str(p))]
+                    iter_name.pop()
                     message.pop()
-                iter_name = iter_name[:-len(str(op))]
+                iter_name.pop()
                 message.pop()
-            iter_name = iter_name[:-len(str(la))]
+            iter_name.pop()
             message.pop()
-        iter_name = iter_name[:-len(str(a))]
+        iter_name.pop()
         message.pop()
+
 #run
 if __name__ == "__main__":
     main()

@@ -107,3 +107,4 @@ venv.bak/
 # result files
 CIFAR10_*/
 MNIST_*/
+console_out.txt
