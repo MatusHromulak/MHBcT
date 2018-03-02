@@ -18,7 +18,7 @@ Supported optional arguments:
 
 
 It is recommended to redirect console output to a file:
-> python MNIST_CNN.py console_out.txt 2>&1
+> python MNIST_CNN.py >console_out.txt 2>&1
 
 If you want to use TensorBoard:
 - before running the program, open TensorBoard in a separate command window:

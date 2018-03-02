@@ -3,6 +3,7 @@
 from __future__ import print_function
 import argparse
 import datetime
+import gc
 import json
 import keras
 from keras.callbacks import CSVLogger
@@ -36,11 +37,11 @@ def parse_arguments():
     
     args = arg_par.parse_args()
     aug_e = args.aug_e          #enable data augmentation
+    arch_se = args.arch_se      #export model architecture to json
     board_se = args.board_se    #enable Tensorboard logging
     mod_se = args.mod_se        #export model data
     hist_se = args.hist_se      #export trainning history data
     hyp_se = args.hyp_se        #export hyperparameters
-    arch_se = args.arch_se      #export model architecture to json
     
     return aug_e, arch_se, board_se, hist_se, hyp_se, mod_se
 
@@ -107,9 +108,9 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                         use_bias=True,
                         bias_initializer=bias_init,
                         input_shape=in_shape))
-        if pooling == 'MaxPool':
+        if pooling == 'MaxPooling':
             model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-        if pooling == 'AvgPool':
+        if pooling == 'AveragePooling':
             model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
     
     if layers >= 4:
@@ -125,9 +126,9 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                         use_bias=True,
                         bias_initializer=bias_init,
                         input_shape=in_shape))
-        if pooling == 'MaxPool':
+        if pooling == 'MaxPooling':
             model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-        if pooling == 'AvgPool':
+        if pooling == 'AveragePooling':
             model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
     
     if layers >= 6:
@@ -143,9 +144,9 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                         use_bias=True,
                         bias_initializer=bias_init,
                         input_shape=in_shape))                    
-        if pooling == 'MaxPool':
+        if pooling == 'MaxPooling':
             model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-        if pooling == 'AvgPool':
+        if pooling == 'AveragePooling':
             model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
     
     model.add(Flatten())
@@ -175,7 +176,6 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
 
 def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
                 aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl):
-    
     #time callback
     time_cb = TimeLog()
     callback = [time_cb]
@@ -277,10 +277,9 @@ def main():
     init_bias = 0.1                 #citation needed
     layers = [2, 4, 6]
     optimizer = ['SGD', 'Adam']     #citation needed
-    learn_rate = 0.01               #citation needed
     loss = 'categorical_crossentropy'
-    pooling = ['MaxPool', 'AvgPool']
-    neurons = [20, 40, 60, 80]
+    pooling = ['MaxPooling', 'AveragePooling']
+    neurons = [16, 32, 64]
     
     #parse command line arguments
     aug_e, arch_se, board_se, hist_se, hyp_se, mod_se = parse_arguments()
@@ -310,20 +309,20 @@ def main():
             #optimizer function selection
             for op in optimizer:
                 if op == 'SGD':
-                    optim = keras.optimizers.SGD(lr=learn_rate)
+                    optim = keras.optimizers.SGD()
                     iter_name.append('s')
                     message.append('Optimizer: SGD')
                 if op == 'Adam':
-                    optim = keras.optimizers.Adam(lr=learn_rate)
+                    optim = keras.optimizers.Adam()
                     iter_name.append('a')
                     message.append('Optimizer: Adam')
                 
                 #pooling layer selection
                 for p in pooling:
-                    if p == 'MaxPool':
+                    if p == 'MaxPooling':
                         iter_name.append('m')
                         message.append('Pooling: MaxPooling')
-                    if p == 'AvgPool':
+                    if p == 'AveragePooling':
                         iter_name.append('a')
                         message.append('Pooling: AveragePooling')
                     
@@ -356,6 +355,7 @@ def main():
                         
                         #clear current model
                         del model
+                        gc.collect()
                         
                         iter_name.pop()
                         message.pop()
