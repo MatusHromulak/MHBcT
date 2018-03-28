@@ -259,7 +259,7 @@ def eval_model(model, tst_dt, tst_lbl, message, res_time):
     #evaluate model
     score = model.evaluate(tst_dt, tst_lbl, verbose=0)
     print(message)
-    print('Loss: ' + str(score[0]) + ' Acuracy: ' + str(score[1]) + ' Time: ' + str(res_time))
+    print('Loss: ' + str(score[0]) + ' Accuracy: ' + str(score[1]) + ' Time: ' + str(res_time))
     
 def main():
     #fixed variables
@@ -277,7 +277,7 @@ def main():
     #layers = [2, 4, 6]
     layers = [4]
     #optimizer = ['SGD', 'Adam']     #citation needed
-    optimizer = ['SGD']     #citation needed
+    optimizer = ['Adam']     #citation needed
     loss = 'categorical_crossentropy'
     #pooling = ['MaxPooling', 'AveragePooling']
     pooling = ['MaxPooling', 'AveragePooling']
