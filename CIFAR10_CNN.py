@@ -40,8 +40,8 @@ def parse_arguments():
     arch_se = args.arch_se      #export model architecture to json
     board_se = args.board_se    #enable Tensorboard logging
     mod_se = args.mod_se        #export model data
-    hist_se = args.hist_se      #export trainning history data
-    hyp_se = args.hyp_se        #export hyperparameters
+    hist_se = args.hist_se      #export training history data
+    hyp_se = args.hyp_se        #export hyper-parameters
     
     return aug_e, arch_se, board_se, hist_se, hyp_se, mod_se
 
@@ -234,7 +234,7 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
             #function that will be implied on each input
             preprocessing_function=None)
 
-        #compute transoformed data set, required for featurewise_center, featurewise_std_normalization, zca_whitening
+        #compute transformed data set, required for featurewise_center, featurewise_std_normalization, zca_whitening
         generator.fit(trn_dt)
         
         #training
@@ -267,21 +267,16 @@ def main():
     width = 28
     num_out_class = 10
     
-    #hyperparameters
-    #activation = ['relu', 'tanh']
-    activation = ['relu']
-    batch_size = 50                 #0.08% of the dataset
-    dropout = 0.5                   #https://arxiv.org/abs/1207.0580
+    #hyper-parameters
+    activation = ['relu', 'tanh']
+    batch_size = 50
+    dropout = 0.5
     epochs = 7
-    init_bias = 0.1                 #citation needed
-    #layers = [2, 4, 6]
-    layers = [4]
-    #optimizer = ['SGD', 'Adam']     #citation needed
-    optimizer = ['Adam']     #citation needed
+    init_bias = 0.1
+    layers = [2, 4, 6]
+    optimizer = ['SGD', 'Adam']
     loss = 'categorical_crossentropy'
-    #pooling = ['MaxPooling', 'AveragePooling']
     pooling = ['MaxPooling', 'AveragePooling']
-    #neurons = [16, 32, 64]
     neurons = [16, 32, 64]
     
     #parse command line arguments
@@ -293,7 +288,7 @@ def main():
     #read in and prepare input data to data. function arguments
     trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape = process_data(height, width, num_out_class)
     
-    #activatio function selection
+    #activation function selection
     for a in activation:
         #iter_name - defines the configuration differentiating handle for file names
         #message - defines the configuration differentiating message for the command line output
