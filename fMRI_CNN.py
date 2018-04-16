@@ -1,16 +1,16 @@
-#CIFAR-10 data CNN classification
+#fMRI data CNN classification
 
 from __future__ import print_function
 import argparse
 import datetime
 import gc
+import scipy.io as spio
 import json
 import keras
 from keras.callbacks import CSVLogger
 from keras.callbacks import TensorBoard
-from keras.datasets import cifar10
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
+from keras.layers import Conv3D, MaxPooling3D, AveragePooling3D
 from keras.models import Sequential
 from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
@@ -27,7 +27,7 @@ class TimeLog(keras.callbacks.Callback):
 
 def parse_arguments():
     #argument parsing
-    arg_par = argparse.ArgumentParser(prog='CIFAR10 CNN')
+    arg_par = argparse.ArgumentParser(prog='StarPlus fMRI CNN')
     arg_par.add_argument('--aug', action='store_true', default=False, dest='aug_e')
     arg_par.add_argument('--arch', action='store_true', default=False, dest='arch_se')
     arg_par.add_argument('--board', action='store_true', default=False, dest='board_se')
@@ -48,7 +48,7 @@ def parse_arguments():
 def prepare_files_folders():
     #save file and folder names and paths preparation
     date_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    res_fol = os.path.join(os.getcwd(), 'CIFAR10_result')
+    res_fol = os.path.join(os.getcwd(), 'fMRI_result')
 
     #create folder for output data
     if not os.path.isdir(res_fol):
@@ -58,7 +58,7 @@ def prepare_files_folders():
 
 def json_export(res_fol, model, date_time, iter_name):
     #export architecture to a json file
-    arch_f = 'cifar10_' + date_time + '_' + ''.join(iter_name) + '_architecture.json'
+    arch_f = 'fmri_' + date_time + '_' + ''.join(iter_name) + '_architecture.json'
     arch_p = os.path.join(res_fol, arch_f)
     arch_string = model.to_json()
     with open(arch_p, 'w') as outfile:
@@ -66,86 +66,84 @@ def json_export(res_fol, model, date_time, iter_name):
 
 def save_model(res_fol, model, date_time, iter_name):
     #save the trained model
-    mod_f = 'cifar10_' + date_time + '_' + ''.join(iter_name) + '_model.h5'
+    mod_f = 'fmri_' + date_time + '_' + ''.join(iter_name) + '_model.h5'
     mod_p = os.path.join(res_fol, mod_f)
     model.save(mod_p)
 
-def process_data(height, width, num_out_class):
-    #load data as function arguments
-    (train_data, train_label), (test_data, test_label) = cifar10.load_data()
-
-    #convert images to tensors
-    in_shape = train_data.shape[1:]
-
-    #normalize data
-    train_data = train_data.astype('float32')
-    test_data = test_data.astype('float32')
-    train_data /= 255
-    test_data /= 255
-
-    #convert class vector (int) to binary class - one hot encoding
-    train_label = keras.utils.to_categorical(train_label, num_out_class)
-    test_label = keras.utils.to_categorical(test_label, num_out_class)
+def process_data(in_shape, num_out_class):
+    #load prepared arrays
+    test_data = np.load('fMRI_data/fMRI_test_images.npy')
+    test_label = np.load('fMRI_data/fMRI_test_labels.npy')
+    train_data = np.load('fMRI_data/fMRI_train_images.npy')
+    train_label = np.load('fMRI_data/fMRI_train_labels.npy')
     
-    return train_data, train_label, test_data, test_label, in_shape
+    #reshape data
+    train_data = train_data.reshape(train_data.shape[0], in_shape[0], in_shape[1], in_shape[2], in_shape[3])
+    test_data = test_data.reshape(test_data.shape[0], in_shape[0], in_shape[1], in_shape[2], in_shape[3])
+    
+    #convert class vector (int) to binary class - one hot encoding
+    test_label = keras.utils.to_categorical(test_label.ravel(), num_out_class)
+    train_label = keras.utils.to_categorical(train_label.ravel(), num_out_class)
+    
+    return train_data, train_label, test_data, test_label
     
 def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim,
                 pooling, in_shape, num_out_class, date_time, res_fol, iter_name):
     model = Sequential()
     
     if layers >= 2:
-        model.add(Conv2D(neurons, kernel_size=(3, 3),
+        model.add(Conv3D(neurons, kernel_size=(3, 3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
                         bias_initializer=bias_init,
                         input_shape=in_shape))
-        model.add(Conv2D(neurons, kernel_size=(3, 3),
+        model.add(Conv3D(neurons, kernel_size=(3, 3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
                         bias_initializer=bias_init))
                         #input_shape=in_shape))
         if pooling == 'MaxPooling':
-            model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+            model.add(MaxPooling3D(pool_size=(2, 2, 2), padding='same'))
         if pooling == 'AveragePooling':
-            model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
+            model.add(AveragePooling3D(pool_size=(2, 2, 2), padding='same'))
     
     if layers >= 4:
-        model.add(Conv2D(neurons*2, kernel_size=(3, 3),
+        model.add(Conv3D(neurons*2, kernel_size=(3, 3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
                         bias_initializer=bias_init))
                         #input_shape=in_shape))
-        model.add(Conv2D(neurons*2, kernel_size=(3, 3),
+        model.add(Conv3D(neurons*2, kernel_size=(3, 3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
                         bias_initializer=bias_init))
                         #input_shape=in_shape))
         if pooling == 'MaxPooling':
-            model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+            model.add(MaxPooling3D(pool_size=(2, 2, 2), padding='same'))
         if pooling == 'AveragePooling':
-            model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
+            model.add(AveragePooling3D(pool_size=(2, 2, 2), padding='same'))
     
     if layers >= 6:
-        model.add(Conv2D(neurons*4, kernel_size=(3, 3),
+        model.add(Conv3D(neurons*4, kernel_size=(3, 3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
                         bias_initializer=bias_init))
                         #input_shape=in_shape))
-        model.add(Conv2D(neurons*4, kernel_size=(3, 3),
+        model.add(Conv3D(neurons*4, kernel_size=(3, 3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
                         bias_initializer=bias_init))
                         #input_shape=in_shape))                    
         if pooling == 'MaxPooling':
-            model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+            model.add(MaxPooling3D(pool_size=(2, 2, 2), padding='same'))
         if pooling == 'AveragePooling':
-            model.add(AveragePooling2D(pool_size=(2, 2), padding='same'))
+            model.add(AveragePooling3D(pool_size=(2, 2, 2), padding='same'))
     
     model.add(Flatten())
     model.add(Dense(1024, activation=activation,
@@ -161,7 +159,7 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                     metrics=['accuracy'])
     
     if hyp_se:
-        mod_f = 'cifar10_' + date_time + '_' + ''.join(iter_name) + '_model.txt'
+        mod_f = 'fmri_' + date_time + '_' + ''.join(iter_name) + '_model.txt'
         mod_p = os.path.join(res_fol, mod_f)
         with open(mod_p,'w') as out_h:
             std_stdout = sys.stdout
@@ -180,7 +178,7 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
     
     #TensorBoard callback
     if board_se:
-        log_fol = os.path.join(res_fol, 'cifar10_' + date_time + '_' + ''.join(iter_name) + '_logs')
+        log_fol = os.path.join(res_fol, 'fmri_' + date_time + '_' + ''.join(iter_name) + '_logs')
         if not os.path.isdir(log_fol):
             os.makedirs(log_fol)
         tensorboard = TensorBoard(log_dir=log_fol.format(time()))
@@ -188,7 +186,7 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
 
     #training history logger callback
     if hist_se:
-        his_f = 'cifar10_' + date_time + '_' + ''.join(iter_name) + '_history.csv'    
+        his_f = 'fmri_' + date_time + '_' + ''.join(iter_name) + '_history.csv'    
         his_p = os.path.join(res_fol, his_f)
         csv_logger = CSVLogger(his_p, append=True, separator=';')
         callback.append(csv_logger)
@@ -210,15 +208,15 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
             #apply ZCA whitening
             zca_whitening=False,
             #degree range for random rotations
-            rotation_range=40,
+            rotation_range=10,
             #range for random horizontal shifts
-            width_shift_range=0.3,
+            width_shift_range=0.2,
             #range for random vertical shifts
-            height_shift_range=0.3,
+            height_shift_range=0.2,
             #shear Intensity (Shear angle in counter-clockwise direction as radians)
-            shear_range=0.7,
+            shear_range=0.3,
             #range for random zoom
-            zoom_range=0.2,
+            zoom_range=0.3,
             #range for random channel shifts
             channel_shift_range=0.3,
             #points outside the boundaries of the input are filled according to the given mode ("constant", "nearest", "reflect", "wrap")
@@ -226,11 +224,11 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
             #value used for points outside the boundaries when fill_mode = "constant"
             cval=0.,
             #randomly flip inputs horizontally
-            horizontal_flip=True,
+            horizontal_flip=False,
             #randomly flip inputs vertically
             vertical_flip=False,
             #rescaling factor
-            rescale=1./255,
+            rescale=None,
             #function that will be implied on each input
             preprocessing_function=None)
 
@@ -263,21 +261,25 @@ def eval_model(model, test_data, test_label, message, res_time):
     
 def main():
     #fixed variables
-    height = 28
-    width = 28
-    num_out_class = 10
+    num_out_class = 3
+    in_shape=(64, 64, 8, 1)
     
     #hyper-parameters
-    activation = ['relu', 'tanh']
-    batch_size = 50
+    activation = ['relu']
+    #activation = ['relu', 'tanh']
+    batch_size = 25
     dropout = 0.5
     epochs = 7
     init_bias = 0.1
-    layers = [2, 4, 6]
-    optimizer = ['SGD', 'Adam']
+    layers = [2]
+    #layers = [2, 4, 6]
+    optimizer = ['SGD']
+    #optimizer = ['SGD', 'Adam']
     loss = 'categorical_crossentropy'
-    pooling = ['MaxPooling', 'AveragePooling']
-    neurons = [16, 32, 64]
+    pooling = ['MaxPooling']
+    #pooling = ['MaxPooling', 'AveragePooling']
+    neurons = [16]
+    #neurons = [16, 32, 64]
     
     #parse command line arguments
     aug_e, arch_se, board_se, hist_se, hyp_se, mod_se = parse_arguments()
@@ -286,7 +288,7 @@ def main():
     date_time, res_fol = prepare_files_folders()
     
     #read in and prepare input data to data. function arguments
-    train_data, train_label, test_data, test_label, in_shape = process_data(height, width, num_out_class)
+    train_data, train_label, test_data, test_label = process_data(in_shape, num_out_class)
     
     #activation function selection
     for a in activation:

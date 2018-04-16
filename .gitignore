@@ -107,4 +107,5 @@ venv.bak/
 # result files
 CIFAR10_*/
 MNIST_*/
+fMRI_*/
 console_out.txt

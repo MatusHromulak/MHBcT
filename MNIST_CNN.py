@@ -72,24 +72,24 @@ def save_model(res_fol, model, date_time, iter_name):
 
 def process_data(height, width, num_out_class):
     #load data as function arguments
-    (trn_dt, trn_lbl), (tst_dt, tst_lbl) = mnist.load_data()
+    (train_data, train_label), (test_data, test_label) = mnist.load_data()
 
     #convert images to tensors
-    trn_dt = trn_dt.reshape(trn_dt.shape[0], height, width, 1)
-    tst_dt = tst_dt.reshape(tst_dt.shape[0], height, width, 1)
+    train_data = train_data.reshape(train_data.shape[0], height, width, 1)
+    test_data = test_data.reshape(test_data.shape[0], height, width, 1)
     in_shape = (height, width, 1)
 
     #normalize data
-    trn_dt = trn_dt.astype('float32')
-    tst_dt = tst_dt.astype('float32')
-    trn_dt /= 255
-    tst_dt /= 255
+    train_data = train_data.astype('float32')
+    test_data = test_data.astype('float32')
+    train_data /= 255
+    test_data /= 255
 
     #convert class vector (int) to binary class - one hot encoding
-    trn_lbl = keras.utils.to_categorical(trn_lbl, num_out_class)
-    tst_lbl = keras.utils.to_categorical(tst_lbl, num_out_class)
+    train_label = keras.utils.to_categorical(train_label, num_out_class)
+    test_label = keras.utils.to_categorical(test_label, num_out_class)
     
-    return trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape
+    return train_data, train_label, test_data, test_label, in_shape
     
 def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim,
                 pooling, in_shape, num_out_class, date_time, res_fol, iter_name):
@@ -106,8 +106,8 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                         padding='same',
                         activation=activation,
                         use_bias=True,
-                        bias_initializer=bias_init,
-                        input_shape=in_shape))
+                        bias_initializer=bias_init))
+                        #input_shape=in_shape))
         if pooling == 'MaxPooling':
             model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
         if pooling == 'AveragePooling':
@@ -118,14 +118,14 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                         padding='same',
                         activation=activation,
                         use_bias=True,
-                        bias_initializer=bias_init,
-                        input_shape=in_shape))
+                        bias_initializer=bias_init))
+                        #input_shape=in_shape))
         model.add(Conv2D(neurons*2, kernel_size=(3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
-                        bias_initializer=bias_init,
-                        input_shape=in_shape))
+                        bias_initializer=bias_init))
+                        #input_shape=in_shape))
         if pooling == 'MaxPooling':
             model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
         if pooling == 'AveragePooling':
@@ -136,14 +136,14 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
                         padding='same',
                         activation=activation,
                         use_bias=True,
-                        bias_initializer=bias_init,
-                        input_shape=in_shape))
+                        bias_initializer=bias_init))
+                        #input_shape=in_shape))
         model.add(Conv2D(neurons*4, kernel_size=(3, 3),
                         padding='same',
                         activation=activation,
                         use_bias=True,
-                        bias_initializer=bias_init,
-                        input_shape=in_shape))                    
+                        bias_initializer=bias_init))
+                        #input_shape=in_shape))                    
         if pooling == 'MaxPooling':
             model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
         if pooling == 'AveragePooling':
@@ -175,7 +175,7 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
     return model
 
 def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
-                aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl):
+                aug_e, train_data, train_label, batch_size, epochs, test_data, test_label):
     #time callback
     time_cb = TimeLog()
     callback = [time_cb]
@@ -237,29 +237,29 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
             preprocessing_function=None)
 
         #compute transformed data set, required for featurewise_center, featurewise_std_normalization, zca_whitening
-        generator.fit(trn_dt)
+        generator.fit(train_data)
         
         #training
-        model.fit_generator(generator.flow(trn_dt, trn_lbl,
+        model.fit_generator(generator.flow(train_data, train_label,
                                         batch_size=batch_size),
                             epochs=epochs, 
                             verbose=0, 
-                            validation_data=(tst_dt, tst_lbl),
+                            validation_data=(test_data, test_label),
                             callbacks=callback)
     #non-augmented training    
     else:
-        model.fit(trn_dt, trn_lbl,
+        model.fit(train_data, train_label,
                     batch_size=batch_size,
                     epochs=epochs,
                     verbose=0,
-                    validation_data=(tst_dt, tst_lbl),
+                    validation_data=(test_data, test_label),
                     callbacks=callback)
     res_time = time_cb.times
     return model, res_time
 
-def eval_model(model, tst_dt, tst_lbl, message, res_time):
+def eval_model(model, test_data, test_label, message, res_time):
     #evaluate model
-    score = model.evaluate(tst_dt, tst_lbl, verbose=0)
+    score = model.evaluate(test_data, test_label, verbose=0)
     print(message)
     print('Loss: ' + str(score[0]) + ' Accuracy: ' + str(score[1]) + ' Time: ' + str(res_time))
     
@@ -288,7 +288,7 @@ def main():
     date_time, res_fol = prepare_files_folders()
     
     #read in and prepare input data to data. function arguments
-    trn_dt, trn_lbl, tst_dt, tst_lbl, in_shape = process_data(height, width, num_out_class)
+    train_data, train_label, test_data, test_label, in_shape = process_data(height, width, num_out_class)
     
     #activation function selection
     for a in activation:
@@ -344,14 +344,14 @@ def main():
                         
                         #train model
                         model, res_time = train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
-                                            aug_e, trn_dt, trn_lbl, batch_size, epochs, tst_dt, tst_lbl)
+                                            aug_e, train_data, train_label, batch_size, epochs, test_data, test_label)
                         
                         #save model architecture, weights, training configuration and optimizer state
                         if mod_se:
                             save_model(res_fol, model, date_time, iter_name)
                         
                         #evaluate model
-                        eval_model(model, tst_dt, tst_lbl, message, res_time)
+                        eval_model(model, test_data, test_label, message, res_time)
                         
                         #clear current model
                         del model
@@ -368,6 +368,6 @@ def main():
         iter_name.pop()
         message.pop()
 
-#run
+#run program
 if __name__ == "__main__":
     main()
