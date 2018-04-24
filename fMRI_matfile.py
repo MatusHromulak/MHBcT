@@ -15,8 +15,8 @@ def process_mat_file(mat_file):
     dimy = int(mat_data['meta']['dimy'][0,0])
     dimz = int(mat_data['meta']['dimz'][0,0])
     
-    #retrieve the first picture/sentence (4 images) and the first rest period (+ another 4 images) from each trial
-    img_count = 8
+    #retrieve the first picture/sentence (8 images) and the first rest period (+ another 8 images) from each trial
+    img_count = 16
     
     #voxel count in trial
     vox_count = int(mat_data['meta']['nvoxels'][0,0])
@@ -32,12 +32,12 @@ def process_mat_file(mat_file):
             continue #no data or label load
             
         elif (cond == 1): #rest interval
-            img_lbl.extend([0,0,0,0,0,0,0,0]) #no stimulus in all images
+            img_lbl.extend([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]) #no stimulus in all images
             
             raw_data = mat_data['data'][i] #get raw data for said trial
             coords = mat_data['meta']['colToCoord'] #get coordinates for column to 3D image transformation
             for j in range(0, img_count): #get first 8 images
-                image_column = raw_data[0][j].astype('float') #retrieve single image data
+                image_column = raw_data[0][j].astype('float16') #retrieve single image data
                 image_3d = np.zeros((dimx,dimy,dimz)) #prepare 3D zero array
                 for k in range(0, vox_count): #transform column shaped data to 3D data
                     x, y, z = coords[0][0][k] #get voxel coordinates
@@ -46,14 +46,14 @@ def process_mat_file(mat_file):
         
         elif (cond == 2 or cond == 3): #sentence or picture
             if (stim == 'P'): 
-                img_lbl.extend([1,1,1,1,0,0,0,0]) #picture stimulus in first 4 images, no stimulus in last 4 images
+                img_lbl.extend([1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0]) #picture stimulus in first 8 images, no stimulus in last 8 images
             elif (stim == 'S'): 
-                img_lbl.extend([2,2,2,2,0,0,0,0]) #sentence stimulus in first 4 images, no stimulus in last 4 images
+                img_lbl.extend([2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0]) #sentence stimulus in first 8 images, no stimulus in last 8 images
             
             raw_data = mat_data['data'][i] #get raw data for said trial
             coords = mat_data['meta']['colToCoord'] #get coordinates for column to 3D image transformation
             for j in range(0, img_count): #get first 8 images
-                image_column = raw_data[0][j].astype('float') #retrieve single image data
+                image_column = raw_data[0][j].astype('float16') #retrieve single image data
                 image_3d = np.zeros((dimx,dimy,dimz)) #prepare 3D zero array
                 for k in range(0, vox_count): #transform column shaped data to 3D data
                     x, y, z = coords[0][0][k] #get voxel coordinates

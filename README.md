@@ -15,10 +15,11 @@ Run as:
 > python fMRI_CNN.py <arguments>
 
 Dependencies:
-Python 3.X
-TensorFlow
-Keras
-TensorBoard
+Python 3.5.4
+TensorFlow 1.7.0
+Keras 2.1.5
+Numpy 1.14.2
+Scipy 1.0
 
 Supported optional arguments:
 --aug	- enable data augmentation

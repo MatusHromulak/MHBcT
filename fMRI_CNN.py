@@ -13,9 +13,11 @@ from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv3D, MaxPooling3D, AveragePooling3D
 from keras.models import Sequential
 from keras.preprocessing.image import ImageDataGenerator
+from keras.backend.tensorflow_backend import set_session
 import numpy as np
 import os
 import sys
+import tensorflow as tf
 from time import time
 
 class TimeLog(keras.callbacks.Callback):
@@ -78,8 +80,8 @@ def process_data(in_shape, num_out_class):
     train_label = np.load('fMRI_data/fMRI_train_labels.npy')
     
     #reshape data
-    train_data = train_data.reshape(train_data.shape[0], in_shape[0], in_shape[1], in_shape[2], in_shape[3])
-    test_data = test_data.reshape(test_data.shape[0], in_shape[0], in_shape[1], in_shape[2], in_shape[3])
+    train_data = (train_data.reshape(train_data.shape[0], in_shape[0], in_shape[1], in_shape[2], in_shape[3])).astype('float16')
+    test_data = (test_data.reshape(test_data.shape[0], in_shape[0], in_shape[1], in_shape[2], in_shape[3])).astype('float16')
     
     #convert class vector (int) to binary class - one hot encoding
     test_label = keras.utils.to_categorical(test_label.ravel(), num_out_class)
@@ -88,7 +90,7 @@ def process_data(in_shape, num_out_class):
     return train_data, train_label, test_data, test_label
     
 def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, optim,
-                pooling, in_shape, num_out_class, date_time, res_fol, iter_name):
+                pooling, in_shape, num_out_class, date_time, res_fol, iter_name, dense_neur):
     model = Sequential()
     
     if layers >= 2:
@@ -146,7 +148,7 @@ def create_model(hyp_se, activation, bias_init, dropout, layers, loss, neurons, 
             model.add(AveragePooling3D(pool_size=(2, 2, 2), padding='same'))
     
     model.add(Flatten())
-    model.add(Dense(1024, activation=activation,
+    model.add(Dense(dense_neur, activation=activation,
                     use_bias=True,
                     bias_initializer=bias_init))
     model.add(Dropout(dropout))
@@ -247,7 +249,7 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
         model.fit(train_data, train_label,
                     batch_size=batch_size,
                     epochs=epochs,
-                    verbose=0,
+                    verbose=1,
                     validation_data=(test_data, test_label),
                     callbacks=callback)
     res_time = time_cb.times
@@ -255,11 +257,11 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
 
 def eval_model(model, test_data, test_label, message, res_time):
     #evaluate model
-    score = model.evaluate(test_data, test_label, verbose=0)
+    score = model.evaluate(test_data, test_label, verbose=1)
     print(message)
     print('Loss: ' + str(score[0]) + ' Accuracy: ' + str(score[1]) + ' Time: ' + str(res_time))
     
-def main():
+def main():    
     #fixed variables
     num_out_class = 3
     in_shape=(64, 64, 8, 1)
@@ -267,19 +269,20 @@ def main():
     #hyper-parameters
     activation = ['relu']
     #activation = ['relu', 'tanh']
-    batch_size = 25
+    batch_size = 5
     dropout = 0.5
     epochs = 7
     init_bias = 0.1
-    layers = [2]
+    layers = [4]
     #layers = [2, 4, 6]
     optimizer = ['SGD']
     #optimizer = ['SGD', 'Adam']
     loss = 'categorical_crossentropy'
-    pooling = ['MaxPooling']
+    pooling = ['AveragePooling']
     #pooling = ['MaxPooling', 'AveragePooling']
-    neurons = [16]
+    neurons = [64]
     #neurons = [16, 32, 64]
+    dense_neur = 128
     
     #parse command line arguments
     aug_e, arch_se, board_se, hist_se, hyp_se, mod_se = parse_arguments()
@@ -336,7 +339,7 @@ def main():
                         model = create_model(hyp_se, a, bias_init, 
                                             dropout, la, loss, n, 
                                             optim, p, in_shape, num_out_class, 
-                                            date_time, res_fol, iter_name)
+                                            date_time, res_fol, iter_name, dense_neur)
                         
                         #export model architecture
                         if arch_se:
