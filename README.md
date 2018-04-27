@@ -4,11 +4,11 @@ CIFAR10_CNN.py
 fMRI_CNN.py
 fMRI_matfile.py
 
-The program fMRI_matfile converts the files available at: http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-81/www/ to .npy files containing cleaned and formated numpy arrays. The program expects the files to be available in the folder ./fMRI_data. The program stores the output data in the same folder.
+The program fMRI_matfile converts the files available at: http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-81/www/ to .npy files containing cleaned and formated numpy arrays. The program expects the files to be available in the folder ./fMRI_data with the name as available on the website. The program stores the output data in the same folder.
 Run as:
 > python fMRI_matfile.py
 
-The programs MNIST_CNN.py, CIFAR10_CNN.py, fMRI_CNN.py implement convolutional neural networks. MNIST and CIFAR download their data for analysis from the internet on the fly. fMRI expects the files provided by fMRI_matfile.py to be available in the folder ./fMRI_data.
+The programs MNIST_CNN.py, CIFAR10_CNN.py, fMRI_CNN.py implement convolutional neural networks. MNIST_CNN.py and CIFAR10_CNN.py download their data for analysis from the internet on the fly. fMRI_CNN.py expects the files provided by fMRI_matfile.py to be available in the folder ./fMRI_data.
 Run as:
 > python MNIST_CNN.py <arguments>
 > python CIFAR10_CNN.py <arguments>

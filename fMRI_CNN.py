@@ -249,7 +249,7 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
         model.fit(train_data, train_label,
                     batch_size=batch_size,
                     epochs=epochs,
-                    verbose=1,
+                    verbose=0,
                     validation_data=(test_data, test_label),
                     callbacks=callback)
     res_time = time_cb.times
@@ -257,31 +257,26 @@ def train_model(model, board_se, hist_se, date_time, res_fol, iter_name,
 
 def eval_model(model, test_data, test_label, message, res_time):
     #evaluate model
-    score = model.evaluate(test_data, test_label, verbose=1)
+    score = model.evaluate(test_data, test_label, verbose=0)
     print(message)
     print('Loss: ' + str(score[0]) + ' Accuracy: ' + str(score[1]) + ' Time: ' + str(res_time))
     
-def main():    
+def main():
     #fixed variables
     num_out_class = 3
     in_shape=(64, 64, 8, 1)
     
     #hyper-parameters
-    activation = ['relu']
-    #activation = ['relu', 'tanh']
+    activation = ['relu', 'tanh']
     batch_size = 5
     dropout = 0.5
     epochs = 7
     init_bias = 0.1
-    layers = [4]
-    #layers = [2, 4, 6]
-    optimizer = ['SGD']
-    #optimizer = ['SGD', 'Adam']
+    layers = [2, 4, 6]
+    optimizer = ['SGD', 'Adam']
     loss = 'categorical_crossentropy'
-    pooling = ['AveragePooling']
-    #pooling = ['MaxPooling', 'AveragePooling']
-    neurons = [64]
-    #neurons = [16, 32, 64]
+    pooling = ['MaxPooling', 'AveragePooling']
+    neurons = [16, 32, 64]
     dense_neur = 128
     
     #parse command line arguments
